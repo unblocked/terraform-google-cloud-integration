@@ -1,7 +1,3 @@
-data "google_project" "this" {
-  project_id = var.project_id
-}
-
 locals {
   required_services = toset([
     "iam.googleapis.com",
@@ -21,20 +17,6 @@ locals {
       )
     ])
   )
-
-  external_account_credential = jsonencode({
-    type                              = "external_account"
-    audience                          = "//iam.googleapis.com/projects/${data.google_project.this.number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.mcp_aws[0].workload_identity_pool_id}/providers/${google_iam_workload_identity_pool_provider.mcp_aws[0].workload_identity_pool_provider_id}"
-    subject_token_type                = "urn:ietf:params:aws:token-type:aws4_request"
-    token_url                         = "https://sts.googleapis.com/v1/token"
-    service_account_impersonation_url = "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${google_service_account.mcp.email}:generateAccessToken"
-    credential_source = {
-      environment_id                 = "aws1"
-      region_url                     = "http://169.254.169.254/latest/meta-data/placement/availability-zone"
-      url                            = "http://169.254.169.254/latest/meta-data/iam/security-credentials"
-      regional_cred_verification_url = "https://sts.{region}.amazonaws.com?Action=GetCallerIdentity&Version=2011-06-15"
-    }
-  })
 }
 
 resource "google_project_service" "required" {
