@@ -126,32 +126,37 @@ The module sets `disable_on_destroy = false` for APIs it enables. Removing the m
 
 Although collection literals in examples use list syntax, Terraform converts them to the declared set types. Callers do not need to use `toset()`.
 
-The module derives the WIF pool and provider IDs from `native_mcp_service_account_id`. For example, `unblocked-gcp-access` creates service account `unblocked-gcp-access`, pool `unblocked-gcp-access-pool`, and provider `unblocked-gcp-access`. Because Google reserves the `gcp-` prefix for WIF IDs, the module removes that prefix when deriving WIF names. Keep the service-account ID stable after the initial apply because changing it replaces these resources and requires newly generated external-account credentials.
+The module derives the WIF pool and provider IDs from `native_mcp_service_account_id`. For example, `unblocked-gcp-access` creates service account `unblocked-gcp-access`, pool `unblocked-gcp-access-pool`, and provider `unblocked-gcp-access`. Because Google reserves the `gcp-` prefix for WIF IDs, the module removes that prefix when deriving WIF names. Keep the service-account ID stable after the initial apply because changing it replaces these resources, which changes the `service_account_email` and `aws_workload_identity_provider` outputs and requires re-sending them to Unblocked.
 
 ## Outputs
 
 | Name | Description |
 | --- | --- |
-| `integration_configuration_json` | Consolidated machine-readable JSON containing the project, service account, MCP endpoints, broker role ARN, WIF provider, and external-account configuration to provide to Unblocked. |
+| `service_account_email` | Native MCP service account email to provide to Unblocked. |
+| `aws_workload_identity_provider` | WIF provider resource name (`projects/{number}/locations/global/workloadIdentityPools/{pool}/providers/{provider}`) to provide to Unblocked. |
 
 ## Integration output
 
-Terraform does not automatically promote a child module's outputs to the root module. Re-export the consolidated integration configuration from the customer's configuration:
+Terraform does not automatically promote a child module's outputs to the root module. Re-export the two identifiers from the customer's configuration:
 
 ```hcl
-output "unblocked_integration_configuration_json" {
-  value       = module.gcp_mcp.integration_configuration_json
-  description = "Configuration to provide to Unblocked after onboarding."
+output "unblocked_service_account_email" {
+  value       = module.gcp_mcp.service_account_email
+  description = "Service account email to provide to Unblocked after onboarding."
+}
+
+output "unblocked_aws_workload_identity_provider" {
+  value       = module.gcp_mcp.aws_workload_identity_provider
+  description = "WIF provider resource name to provide to Unblocked after onboarding."
 }
 ```
 
-After applying, retrieve it with:
+After applying, retrieve them with:
 
 ```shell
-terraform output -raw unblocked_integration_configuration_json
+terraform output -raw unblocked_service_account_email
+terraform output -raw unblocked_aws_workload_identity_provider
 ```
-
-Copy and send the complete command output to Unblocked; no additional parsing is required. This is the only module output customers need to hand over, and it contains no private key or other long-lived credential. Unblocked assumes one of its `aws_broker_role_arns`, then uses `aws_external_account_credential` as the read-only `GOOGLE_APPLICATION_CREDENTIALS` file.
 
 ## Resources created
 
