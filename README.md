@@ -124,9 +124,16 @@ The module sets `disable_on_destroy = false` for APIs it enables. Removing the m
 | `native_mcp_roles` | Project IAM roles granted to the MCP service account for access to underlying Google Cloud data. May be empty, but MCP tools will only succeed when the account has the permissions they require. | `set(string)` | n/a | yes |
 | `aws_account` | Trusted Unblocked AWS account ID and the non-empty set of exact broker role names allowed to federate. | `object({ account_id = string, role_names = set(string) })` | n/a | yes |
 
-Although collection literals in examples use list syntax, Terraform converts them to the declared set types. Callers do not need to use `toset()`.
-
 The module derives the WIF pool and provider IDs from `native_mcp_service_account_id`. For example, `unblocked-gcp-access` creates service account `unblocked-gcp-access`, pool `unblocked-gcp-access-pool`, and provider `unblocked-gcp-access`. Because Google reserves the `gcp-` prefix for WIF IDs, the module removes that prefix when deriving WIF names. Keep the service-account ID stable after the initial apply because changing it replaces these resources, which changes the `service_account_email` and `aws_workload_identity_provider` outputs and requires re-sending them to Unblocked.
+
+### Allowed services and roles authorize at different layers
+
+`native_mcp_allowed_services` and `native_mcp_roles` control two independent authorization layers, and a native MCP tool call succeeds only when both permit it:
+
+- `native_mcp_allowed_services` enables each service's API and scopes the `roles/mcp.toolUser` condition to that set. This governs only whether the service account may *invoke* the native MCP tools for those services.
+- `native_mcp_roles` grants the IAM roles the service account uses to read data. When a tool runs, it calls the underlying Google Cloud API as the service account, and that call is checked against these roles.
+
+Adding a service to `native_mcp_allowed_services` enables its API and permits the tool call, but does not by itself let the service account read that service's data. Add a role that covers it to `native_mcp_roles` as well. Basic `roles/viewer` already covers most resource metadata, but data-plane content — log entries, monitoring data, storage objects, secret payloads — requires the service's specific viewer role (for example `roles/logging.viewer` for Cloud Logging). Without a covering role, the tool is callable but the underlying read is denied.
 
 ## Outputs
 
@@ -172,7 +179,5 @@ Depending on the inputs, the module creates:
 ## Security model
 
 - Authentication uses short-lived AWS and Google credentials; the module does not create service-account keys.
-- The AWS provider verifies the AWS account ID and permits only configured broker role names. Individual Unblocked services assume the broker role, so adding a service does not require a customer-side WIF change.
 - `roles/mcp.toolUser` is conditioned on the configured Google Cloud service allowlist.
 - `native_mcp_roles` controls which underlying Google Cloud resources and data the MCP service account can read.
-- The module does not grant Google users local ADC impersonation access.
